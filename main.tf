@@ -1,8 +1,4 @@
 # main.tf (root)
-# Data sources
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
-
 # Random string for unique resource names
 resource "random_string" "suffix" {
   length  = 8
