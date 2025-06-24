@@ -1,4 +1,5 @@
-# variables.tf
+# variables.tf (root)
+# Core configuration
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
@@ -32,6 +33,44 @@ variable "environment" {
   }
 }
 
+# Module toggles
+variable "enable_config" {
+  description = "Enable AWS Config for compliance monitoring"
+  type        = bool
+  default     = true
+}
+
+variable "enable_config_s3_bucket" {
+  description = "Enable S3 bucket creation for AWS Config (only used if enable_config is true)"
+  type        = bool
+  default     = true
+}
+
+variable "enable_cloudtrail" {
+  description = "Enable CloudTrail for audit logging"
+  type        = bool
+  default     = true
+}
+
+variable "enable_cloudtrail_s3_bucket" {
+  description = "Enable S3 bucket creation for CloudTrail (only used if enable_cloudtrail is true)"
+  type        = bool
+  default     = true
+}
+
+variable "enable_guardduty" {
+  description = "Enable GuardDuty for threat detection"
+  type        = bool
+  default     = true
+}
+
+variable "enable_monitoring" {
+  description = "Enable monitoring and alerting"
+  type        = bool
+  default     = true
+}
+
+# Network configuration
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string
@@ -54,6 +93,7 @@ variable "allowed_ip_ranges" {
   }
 }
 
+# IAM configuration
 variable "admin_user_arns" {
   description = "List of IAM user ARNs that can assume the admin role"
   type        = list(string)
@@ -79,6 +119,7 @@ variable "external_id" {
   sensitive   = true
 }
 
+# Security configuration
 variable "max_tokens_limit" {
   description = "Maximum number of tokens allowed per request"
   type        = number
@@ -101,6 +142,7 @@ variable "log_retention_days" {
   }
 }
 
+# Monitoring configuration
 variable "usage_alarm_threshold" {
   description = "Threshold for Bedrock usage alarm"
   type        = number
