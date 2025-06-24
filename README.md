@@ -47,7 +47,7 @@ claude-sonnet-4-bedrock/
 ├── security.tf               # Security services (Config, CloudTrail, GuardDuty)
 ├── monitoring.tf             # Monitoring and alerting
 ├── outputs.tf                # Output values
-├── terraform.tfvars.example  # Example variable values
+├── example.tfvars            # Example variable values
 └── README.md                 # This file
 ```
 
@@ -77,7 +77,7 @@ aws bedrock list-foundation-models \
 
 ```bash
 # Copy example configuration
-cp terraform.tfvars.example terraform.tfvars
+cp example.tfvars terraform.tfvars
 
 # Edit with your specific values
 vim terraform.tfvars
