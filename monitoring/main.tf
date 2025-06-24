@@ -108,7 +108,8 @@ resource "aws_budgets_budget" "bedrock_budget" {
   time_period_start = "2025-01-01_00:00"
 
   cost_filter {
-    Service = ["Amazon Bedrock"]
+    name = "Service"
+    values = ["Amazon Bedrock"]
   }
 
   notification {
