@@ -14,274 +14,253 @@ claude-sonnet-4-bedrock/
 ├── README.md                    # This file
 └── modules/
     ├── core/                    # Core infrastructure (VPC, IAM, Bedrock)
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   ├── outputs.tf
-    │   └── locals.tf
-    ├── s3/                      # S3 buckets for Config and CloudTrail
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   └── outputs.tf
-    ├── config/                  # AWS Config compliance monitoring
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   └── outputs.tf
-    ├── cloudtrail/              # CloudTrail audit logging
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   └── outputs.tf
+    ├── s3/                      # Generic, reusable S3 bucket module
+    ├── config/                  # AWS Config (calls s3 module internally)
+    ├── cloudtrail/              # CloudTrail (calls s3 module internally)
     ├── guardduty/               # GuardDuty threat detection
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   └── outputs.tf
     └── monitoring/              # CloudWatch monitoring and alerting
-        ├── main.tf
-        ├── variables.tf
-        ├── outputs.tf
-        └── locals.tf
 ```
 
-## 🔧 Modular Architecture Benefits
+## 🔧 Improved S3 Architecture
 
-### **Selective Deployment**
-Enable/disable features based on your needs:
+### **Generic S3 Module**
+The `s3` module is now a reusable component that can create purpose-specific buckets:
 
 ```hcl
-# For development - minimal setup
-enable_s3_buckets = false   # Disable S3 buckets
-enable_config     = false   # Disable AWS Config
-enable_cloudtrail = false   # Disable CloudTrail
-enable_guardduty  = false   # Disable GuardDuty
-enable_monitoring = false   # Disable monitoring
-
-# For production - full security stack
-enable_s3_buckets = true    # Enable all features
-enable_config     = true
-enable_cloudtrail = true
-enable_guardduty  = true
-enable_monitoring = true
+module "s3_bucket" {
+  source = "../s3"
+  
+  project_name   = "my-project"
+  bucket_purpose = "config"        # or "cloudtrail"
+  random_suffix  = "abc123"
+  account_id     = "123456789012"
+  region        = "us-east-1"
+}
 ```
 
-### **Module Dependencies**
-- **Core**: Always deployed (VPC, IAM, Bedrock access)
-- **S3**: Required for Config and CloudTrail
-- **Config**: Requires S3 module
-- **CloudTrail**: Requires S3 module
-- **GuardDuty**: Standalone
-- **Monitoring**: Standalone but uses core resources
+### **Module-Specific S3 Control**
+Each consumer module controls its own S3 bucket creation:
 
-## 🚀 Quick Start
-
-### **Development Setup (Minimal)**
 ```hcl
 # terraform.tfvars
-enable_s3_buckets = false
-enable_config     = false
-enable_cloudtrail = false
-enable_guardduty  = false
-enable_monitoring = false
+enable_config               = true   # Enable Config module
+enable_config_s3_bucket     = true   # Config creates its own S3 bucket
+
+enable_cloudtrail           = true   # Enable CloudTrail module  
+enable_cloudtrail_s3_bucket = false  # CloudTrail uses existing bucket
+```
+
+## 🚀 Flexible Deployment Options
+
+### **Development Setup (No S3 Costs)**
+```hcl
+# terraform.tfvars
+enable_config               = true
+enable_config_s3_bucket     = false  # Use existing or no bucket
+
+enable_cloudtrail           = true
+enable_cloudtrail_s3_bucket = false  # Use existing or no bucket
+
+enable_guardduty  = false  # Disable to save costs
+enable_monitoring = false  # Disable to save costs
 ```
 
 ### **Production Setup (Full Security)**
 ```hcl
 # terraform.tfvars
-enable_s3_buckets = true
-enable_config     = true
-enable_cloudtrail = true
-enable_guardduty  = true
-enable_monitoring = true
+enable_config               = true
+enable_config_s3_bucket     = true   # Create dedicated bucket
+
+enable_cloudtrail           = true
+enable_cloudtrail_s3_bucket = true   # Create dedicated bucket
+
+enable_guardduty  = true   # Full threat detection
+enable_monitoring = true   # Full monitoring stack
 ```
 
-### **Staged Deployment**
-```bash
-# Stage 1: Core only
-terraform apply -target=module.core
+### **Hybrid Setup (Existing Buckets)**
+```hcl
+# terraform.tfvars
+enable_config               = true
+enable_config_s3_bucket     = false
+# Config module can be configured to use existing bucket via:
+# existing_s3_bucket_name = "my-existing-config-bucket"
 
-# Stage 2: Add S3 buckets
-terraform apply -target=module.s3
-
-# Stage 3: Add Config
-terraform apply -target=module.config
-
-# Stage 4: Full deployment
-terraform apply
+enable_cloudtrail           = true  
+enable_cloudtrail_s3_bucket = true   # Create new bucket for CloudTrail
 ```
 
 ## 📋 Module Details
 
 ### **Core Module** (Always Required)
-- VPC with private subnets
-- VPC endpoints for Bedrock
-- IAM roles and policies
-- Security groups
+- VPC with private subnets and endpoints
+- IAM roles for admin, user, and application access
+- Security groups and VPC Flow Logs
 - CloudWatch log groups
-- VPC Flow Logs
 
-**Key Resources:**
-- `aws_vpc.bedrock_vpc`
-- `aws_vpc_endpoint.bedrock_runtime`
-- `aws_iam_role.bedrock_user_role`
-- `aws_iam_role.bedrock_application_role`
+### **S3 Module** (Generic, Reusable)
+- Creates purpose-specific S3 buckets
+- Handles bucket policies for different AWS services
+- Supports Config, CloudTrail, and extensible for future services
+- Configurable encryption, versioning, and access controls
 
-### **S3 Module** (Conditional)
-- Encrypted S3 buckets for Config and CloudTrail
-- Bucket policies for service access
-- Public access blocks
-
-**Key Resources:**
-- `aws_s3_bucket.config_bucket`
-- `aws_s3_bucket.cloudtrail_bucket`
+**Usage by other modules:**
+```hcl
+module "s3_bucket" {
+  source = "../s3"
+  
+  bucket_purpose = "config"  # Automatically configures policies for Config service
+  # ... other variables
+}
+```
 
 ### **Config Module** (Conditional)
 - AWS Config recorder and delivery channel
 - Config rules for compliance
-- IAM role for Config service
-
-**Key Resources:**
-- `aws_config_configuration_recorder.bedrock_config`
-- `aws_config_config_rule.iam_password_policy`
+- **Optionally creates S3 bucket** via internal s3 module call
+- Can use existing S3 bucket if `enable_s3_bucket = false`
 
 ### **CloudTrail Module** (Conditional)
-- Multi-region CloudTrail
-- Bedrock-specific data events
-- API call rate insights
-
-**Key Resources:**
-- `aws_cloudtrail.bedrock_trail`
+- Multi-region CloudTrail with Bedrock-specific events
+- **Optionally creates S3 bucket** via internal s3 module call
+- Can use existing S3 bucket if `enable_s3_bucket = false`
 
 ### **GuardDuty Module** (Conditional)
 - Threat detection and monitoring
-- S3 protection
-- Malware protection
-
-**Key Resources:**
-- `aws_guardduty_detector.bedrock_guardduty`
+- Configurable protection features
 
 ### **Monitoring Module** (Conditional)
-- CloudWatch dashboard
-- Usage and error alarms
-- SNS notifications
-- Cost budgets
+- CloudWatch dashboards and alarms
+- SNS notifications and cost budgets
 
-**Key Resources:**
-- `aws_cloudwatch_dashboard.bedrock_dashboard`
-- `aws_cloudwatch_metric_alarm.high_bedrock_usage`
-- `aws_budgets_budget.bedrock_budget`
+## 🎯 Key Benefits
 
-## 🔒 Security Features
+### **1. Granular Control**
+```hcl
+# Enable Config but use existing bucket
+enable_config           = true
+enable_config_s3_bucket = false
 
-All modules implement security best practices:
-- **Least privilege IAM policies**
-- **Encrypted storage** (S3, CloudWatch)
-- **IP-based access controls**
-- **VPC isolation** with private subnets
-- **Audit trails** and compliance monitoring
+# Enable CloudTrail and create new bucket
+enable_cloudtrail           = true
+enable_cloudtrail_s3_bucket = true
+```
+
+### **2. Cost Optimization**
+- **Development**: Disable S3 bucket creation to save ~$2-5/month per service
+- **Staging**: Mix of new and existing buckets based on needs
+- **Production**: Full bucket creation for isolation and compliance
+
+### **3. Reusable S3 Module**
+- Single S3 module handles all bucket types
+- Purpose-specific policies (Config vs CloudTrail)
+- Easy to extend for new services (future Lambda modules, etc.)
+
+### **4. No Dependencies Between Modules**
+- Config module doesn't depend on CloudTrail module
+- Each module manages its own S3 bucket independently
+- Simpler dependency graph and faster deployments
 
 ## 🛠️ Usage Examples
 
-### **Development Workflow**
+### **Progressive Deployment**
 ```bash
-# Start with core only
-terraform apply -var="enable_monitoring=false" -var="enable_config=false"
+# Stage 1: Core infrastructure only
+terraform apply -target=module.core
 
-# Test Bedrock access
-aws bedrock invoke-model --model-id anthropic.claude-sonnet-4-20250514-v1:0 ...
+# Stage 2: Add Config without S3
+terraform apply -var="enable_config=true" -var="enable_config_s3_bucket=false"
 
-# Add monitoring when needed
-terraform apply -var="enable_monitoring=true"
+# Stage 3: Add Config S3 bucket
+terraform apply -var="enable_config_s3_bucket=true"
+
+# Stage 4: Add CloudTrail with its own bucket
+terraform apply -var="enable_cloudtrail=true"
 ```
 
-### **Production Deployment**
+### **Mixed Environment**
 ```bash
-# Full deployment with all security features
-terraform apply
-
-# Verify all modules
-terraform output | grep -E "(config|cloudtrail|guardduty|monitoring)"
-```
-
-### **Cost Optimization**
-```bash
-# Disable expensive features for testing
+# Config uses existing corporate bucket, CloudTrail creates new
 terraform apply \
+  -var="enable_config=true" \
+  -var="enable_config_s3_bucket=false" \
+  -var="enable_cloudtrail=true" \
+  -var="enable_cloudtrail_s3_bucket=true"
+```
+
+### **Development Environment** 
+```bash
+# Minimal setup - no S3 costs
+terraform apply \
+  -var="enable_config_s3_bucket=false" \
+  -var="enable_cloudtrail_s3_bucket=false" \
   -var="enable_guardduty=false" \
-  -var="enable_cloudtrail=false" \
-  -var="log_retention_days=1"
+  -var="enable_monitoring=false"
 ```
 
-## 💰 Cost Optimization
+## 🔒 Security Features
 
-### **Module Cost Impact**
-- **Core**: ~$15/month (VPC endpoints, logs)
-- **S3**: ~$1/month (storage)
-- **Config**: ~$2/month (evaluations)
-- **CloudTrail**: ~$2/month (events)
-- **GuardDuty**: ~$3/month (findings)
-- **Monitoring**: ~$1/month (dashboards)
+All modules maintain enterprise-grade security:
+- **Least privilege IAM policies**
+- **IP-based access restrictions**
+- **Encrypted storage and transit**
+- **VPC isolation with private subnets**
+- **Comprehensive audit trails**
 
-### **Development Cost Savings**
-Disable modules you don't need:
+## 💰 Cost Impact
+
+### **S3 Bucket Costs by Module**
+- **Config S3**: ~$1-2/month (compliance data)
+- **CloudTrail S3**: ~$1-3/month (audit logs)
+- **No S3**: $0/month (use existing buckets)
+
+### **Total Monthly Costs**
+- **Core only**: ~$15/month
+- **+ Config (no S3)**: ~$17/month  
+- **+ Config (with S3)**: ~$19/month
+- **+ CloudTrail (with S3)**: ~$22/month
+- **+ Full stack**: ~$28/month
+
+## 🎛️ Configuration Examples
+
+### **terraform.tfvars for Development**
 ```hcl
-# Minimal development setup (~$15/month)
-enable_s3_buckets = false
-enable_config     = false
-enable_cloudtrail = false
-enable_guardduty  = false
-enable_monitoring = false
+# Enable services but minimize costs
+enable_config               = true
+enable_config_s3_bucket     = false  # Save $2/month
+
+enable_cloudtrail           = true
+enable_cloudtrail_s3_bucket = false  # Save $2/month
+
+enable_guardduty  = false  # Save $3/month
+enable_monitoring = false  # Save $1/month
 ```
 
-## 🔧 Customization
-
-### **Adding New Modules**
-1. Create module directory: `modules/new-module/`
-2. Add module call in root `main.tf`
-3. Add enable toggle in `variables.tf`
-4. Add outputs to root `outputs.tf`
-
-### **Module Dependencies**
-Use `depends_on` for module dependencies:
+### **terraform.tfvars for Production**
 ```hcl
-module "config" {
-  count  = var.enable_config ? 1 : 0
-  source = "./modules/config"
+# Full security and compliance
+enable_config               = true
+enable_config_s3_bucket     = true
+
+enable_cloudtrail           = true
+enable_cloudtrail_s3_bucket = true
+
+enable_guardduty  = true
+enable_monitoring = true
+```
+
+## 🚀 Future Extensibility
+
+The S3 module can easily support new bucket purposes:
+
+```hcl
+# Future: Lambda function artifacts
+module "lambda_s3" {
+  source = "./modules/s3"
   
-  config_bucket_id = var.enable_s3_buckets ? module.s3[0].config_bucket_id : null
-  
-  depends_on = [module.s3]
+  bucket_purpose = "lambda"  # New purpose
+  # ... rest of config
 }
 ```
 
-## 🛡️ Security Best Practices
-
-### **Module Isolation**
-- Each module has its own IAM roles
-- Resource-level permissions
-- Module-specific tagging
-
-### **Progressive Security**
-- Start with core security (VPC, IAM)
-- Add compliance (Config, CloudTrail)
-- Add monitoring (CloudWatch, GuardDuty)
-
-## 📞 Support
-
-For module-specific issues:
-- **Core Module**: VPC, IAM, Bedrock connectivity
-- **S3 Module**: Bucket permissions, encryption
-- **Config Module**: Compliance rules, service roles
-- **CloudTrail Module**: Audit logging, event selectors
-- **GuardDuty Module**: Threat detection settings
-- **Monitoring Module**: Alarms, dashboards, budgets
-
-## 🤝 Contributing
-
-When adding new modules:
-1. Follow the established structure
-2. Include proper variable validation
-3. Add comprehensive outputs
-4. Update the root module integration
-5. Test both enabled/disabled states
-
----
-
-**🎯 Key Benefit**: This modular approach allows you to deploy just what you need for development while providing a clear path to full production security when ready.
+This architecture provides the perfect balance of **flexibility**, **cost control**, and **maintainability** while ensuring each module remains focused and independent.
