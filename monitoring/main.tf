@@ -107,7 +107,7 @@ resource "aws_budgets_budget" "bedrock_budget" {
   time_unit    = "MONTHLY"
   time_period_start = "2025-01-01_00:00"
 
-  cost_filter = {
+  cost_filter {
     Service = ["Amazon Bedrock"]
   }
 
