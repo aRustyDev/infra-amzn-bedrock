@@ -1,0 +1,3 @@
+AWS_DEFAULT_REGION="op://raytheon/eastwest/default region"
+AWS_ACCESS_KEY_ID="op://raytheon/eastwest/access key id"
+AWS_SECRET_ACCESS_KEY="op://raytheon/eastwest/secret access key"
