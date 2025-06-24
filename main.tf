@@ -8,7 +8,7 @@ resource "random_string" "suffix" {
 
 # Core infrastructure module (always deployed)
 module "core" {
-  source = "./modules/core"
+  source = "./core"
   
   # Pass through variables
   project_name              = var.project_name
@@ -31,7 +31,7 @@ module "core" {
 # AWS Config module (conditional)
 module "config" {
   count  = var.enable_config ? 1 : 0
-  source = "./modules/config"
+  source = "./config"
   
   project_name       = var.project_name
   default_tags       = var.default_tags
@@ -43,7 +43,7 @@ module "config" {
 # CloudTrail module (conditional)
 module "cloudtrail" {
   count  = var.enable_cloudtrail ? 1 : 0
-  source = "./modules/cloudtrail"
+  source = "./cloudtrail"
   
   project_name     = var.project_name
   default_tags     = var.default_tags
@@ -56,7 +56,7 @@ module "cloudtrail" {
 # GuardDuty module (conditional)
 module "guardduty" {
   count  = var.enable_guardduty ? 1 : 0
-  source = "./modules/guardduty"
+  source = "./guardduty"
   
   default_tags = var.default_tags
 }
@@ -64,7 +64,7 @@ module "guardduty" {
 # Monitoring module (conditional)
 module "monitoring" {
   count  = var.enable_monitoring ? 1 : 0
-  source = "./modules/monitoring"
+  source = "./monitoring"
   
   project_name            = var.project_name
   default_tags            = var.default_tags
