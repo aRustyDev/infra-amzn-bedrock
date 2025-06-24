@@ -28,7 +28,7 @@ resource "aws_cloudtrail" "bedrock_trail" {
     exclude_management_event_sources = []
 
     data_resource {
-      type   = "AWS::Bedrock::*"
+      type   = "AWS::S3::Object"
       values = ["arn:aws:bedrock:*"]
     }
   }
